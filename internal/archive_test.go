@@ -1,4 +1,7 @@
 package internal
+// Copyright (c) 2019 Fred Lewis. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 import (
 	"testing"
@@ -17,10 +20,10 @@ func TestDataOneSecond(t *testing.T) {
 
 	d, ts := c.getData(1560632000, 1560633000)
 	if len(d["val"]) != 1000 {
-		t.Errorf("Data is length %d", len(d))
+		t.Errorf("Data is length %d", len(d["val"]))
 	}
 	if len(ts) != 1000 {
-		t.Errorf("Timestamps is length %d", len(d))
+		t.Errorf("Timestamps is length %d", len(d["val"]))
 	}
 	if ts[0] != startTime {
 		t.Errorf("First timestamp is %d", ts[0])
