@@ -18,12 +18,11 @@ write call writes a full chunk. Retentions are also exercised whenever
 Write() is called.  Chunks that are fully beyond the retention time are
 deleted.
 
-##### Things to know:
+##### Getting Started
 
-- Tissa normalizes datapoints as they are added.  Timestamps are aligned to
-interval boundaries, and any missing intervals are filled in with the
-specified defaul value
-- The latest chunk of each archive is cached in-memory
+```
+go get github.com/fred-lewis/tissa
+```
 
 Example:
 ```
@@ -74,3 +73,10 @@ Output:
 [1560632040]
 map[thing1:[150] thing2:[250]]
 ```
+
+##### Things to know:
+
+- Tissa normalizes datapoints as they are added.  Timestamps are aligned to
+interval boundaries, and any missing intervals are filled in with the
+specified defaul value
+- The latest chunk of each archive is cached in-memory
