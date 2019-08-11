@@ -1,4 +1,4 @@
-##Tissa
+## Tissa
 #### Time Series Storage Archive
 
 Package tissa provides a simple embedded time series storage engine.
