@@ -18,13 +18,13 @@ write call writes a full chunk. Retentions are also exercised whenever
 Write() is called.  Chunks that are fully beyond the retention time are
 deleted.
 
-##### Getting Started
+#### Getting Started
 
 ```
 go get github.com/fred-lewis/tissa
 ```
 
-Example:
+#### Example:
 ```
 tsc := TimeSeriesConfig{
 	Archives: []ArchiveConfig{
@@ -74,7 +74,11 @@ Output:
 map[thing1:[150] thing2:[250]]
 ```
 
-##### Things to know:
+#### GoDoc
+
+https://godoc.org/github.com/fred-lewis/tissa
+
+#### Things to know:
 
 - Tissa normalizes datapoints as they are added.  Timestamps are aligned to
 interval boundaries, and any missing intervals are filled in with the
