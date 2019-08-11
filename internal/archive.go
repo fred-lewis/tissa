@@ -139,13 +139,11 @@ func (a *Archive) GetData(startTime, endTime int64) (map[string][]interface{}, [
 					data[key] = exst
 				}
 				for j := 0; j < len(ticks); j++ {
-					exst[i] = ticks[j]
-					i++
+					exst[i + int64(j)] = ticks[j]
 				}
 			}
-		} else {
-			i += (cEnd - cStart) / a.Interval
 		}
+		i += (cEnd - cStart) / a.Interval
 		chunkStart += a.ChunkSize
 	}
 
@@ -299,7 +297,15 @@ func (c *chunk) latest() map[string]interface{} {
 }
 
 func (c *chunk) append(val map[string]interface{}, timestamp int64) {
-	if timestamp <= c.EndTime {
+	if timestamp < c.EndTime {
+		return
+	}
+
+	if timestamp == c.EndTime {
+		latest := c.Data[len(c.Data) - 1]
+		for k, v := range c.derefTags(val) {
+			latest[k] = v
+		}
 		return
 	}
 
@@ -368,6 +374,7 @@ func (c *chunk) derefTags(val map[string]interface{}) map[int]interface{} {
 		i, ok := c.tagMap[tag]
 		if !ok {
 			c.tagMap[tag] = len(c.Tags)
+			i = len(c.Tags)
 			c.Tags = append(c.Tags, tag)
 		}
 		ret[i] = v

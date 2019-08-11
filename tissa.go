@@ -1,5 +1,8 @@
 package tissa
 
+// Copyright (c) 2019 Fred Lewis. All rights reserved.
+// Use of this source code is governed by a MIT license found in the LICENSE file.
+
 import (
 	"github.com/fred-lewis/tissa/internal"
 	"fmt"
@@ -10,7 +13,35 @@ import (
 	"time"
 )
 
-// each divisible by all priors
+//
+// A TimeSeries can track multiple key/value pairs over time.
+// TimeSeries are append-only,and data can be rolled up to a
+// number of loawer-resolution archives.
+//
+type TimeSeries struct {
+	archives    []*internal.Archive
+	config      TimeSeriesConfig
+	LastWritten int64
+}
+
+//
+// One or more ArchiveConfigs is required. DefaultValue is the value
+// to use for missing data.
+//
+type TimeSeriesConfig struct {
+	Archives []ArchiveConfig
+	DefaultValue float64
+}
+
+// Resolution and retention specified in seconds.  Use
+// package-level enum (SECOND, TEN_SECOND ...) to ensure
+// all resolutions divide evenly
+type ArchiveConfig struct {
+	Resolution int64
+	Retention  int64
+}
+
+// Each divisible by all priors
 const (
 	SECOND int64 = 1
 	TEN_SECOND = 10
@@ -27,22 +58,14 @@ const (
 
 const chunkSizeSlots = 2000
 
-type ArchiveConfig struct {
-	Resolution int64
-	Retention  int64
-}
 
-type TimeSeriesConfig struct {
-	Archives []ArchiveConfig
-	DefaultValue float64
-}
-
-type TimeSeries struct {
-	archives    []*internal.Archive
-	config      TimeSeriesConfig
-	LastWritten int64
-}
-
+//
+// Construct a new TimeSeries in the given directory, with the given configuration
+//
+// At least one archive must be provided.  If multiple archives are provided,
+// each resolution must be a multiple of the last, and rollups will be
+// populated automatically when new data is inserted.
+//
 func NewTimeSeries(dir string, config TimeSeriesConfig) (*TimeSeries, error) {
 	if config.Archives == nil || len(config.Archives) == 0 {
 		return nil, fmt.Errorf("config must specify at least one archive")
@@ -83,6 +106,9 @@ func NewTimeSeries(dir string, config TimeSeriesConfig) (*TimeSeries, error) {
 	return &series, nil
 }
 
+//
+//  Open an existing TimeSeries in the given directory
+//
 func OpenTimeSeries(dir string) (*TimeSeries, error) {
 	fp := filepath.Join(dir, "config")
 
@@ -105,6 +131,23 @@ func OpenTimeSeries(dir string) (*TimeSeries, error) {
 	return &series, nil
 }
 
+
+//
+// Add a single key-value pair to the timeseries with the given
+// timestamp.  Timeseries are append-only.  Timestamps will be
+// normalized to a multiple of the TimeSeries' base resolution.
+//
+func (t *TimeSeries) AddValue(key string, val float64, timestamp int64) error {
+	valMap := make(map[string]float64, 0)
+	valMap[key] = val
+	return t.AddValues(valMap, timestamp)
+}
+
+
+//
+// Add multiple key-value pairs for the given timestamp. Timestamps
+// will be normalized to a multiple of the TimeSeries' base resolution.
+//
 func (t *TimeSeries) AddValues(vals map[string]float64, timestamp int64) error {
 	curArchive := t.baseArchive()
 	lastTimestamp := curArchive.EndTime
@@ -116,8 +159,6 @@ func (t *TimeSeries) AddValues(vals map[string]float64, timestamp int64) error {
 
 	curArchive.Append(convertedMap, timestamp)
 
-	fmt.Printf("ts: %d\n", timestamp)
-
 	for i := 1; i < len(t.archives); i++ {
 		rollupArchive := t.archives[i]
 		rollupIval := rollupArchive.Interval
@@ -126,8 +167,6 @@ func (t *TimeSeries) AddValues(vals map[string]float64, timestamp int64) error {
 			// done rolling up
 			break
 		}
-
-		fmt.Printf("ts: %d rollup: %d\n", timestamp, rollupIval)
 
 		rollupStart := timestamp - (timestamp % rollupIval) - rollupIval
 		rollupEnd := rollupStart + rollupIval
@@ -148,6 +187,10 @@ func (t *TimeSeries) AddValues(vals map[string]float64, timestamp int64) error {
 	return nil
 }
 
+
+//
+//  Retrieve the latest key-value pairs
+//
 func (t *TimeSeries) Latest() (val map[string]float64, timestamp int64) {
 	d, ts := t.baseArchive().Latest()
 	res := make(map[string]float64, len(d))
@@ -157,6 +200,9 @@ func (t *TimeSeries) Latest() (val map[string]float64, timestamp int64) {
 	return res, ts
 }
 
+//
+//  For querying rollup archives.  Returns average value series for all keys.
+//
 func (t *TimeSeries) Averages(startTime, endTime, resolution int64) (map[string][]float64, []int64, error) {
 	return t.walkData(startTime, endTime, resolution, func(r Rollup) float64 {
 		if r.Count > 0 {
@@ -166,6 +212,9 @@ func (t *TimeSeries) Averages(startTime, endTime, resolution int64) (map[string]
 	})
 }
 
+//
+//  For querying rollup archives.  Returns maximum value series for all keys.
+//
 func (t *TimeSeries) Maximums(startTime, endTime, resolution int64) (map[string][]float64, []int64, error) {
 	return t.walkData(startTime, endTime, resolution, func(r Rollup) float64 {
 		if r.Count > 0 {
@@ -175,6 +224,9 @@ func (t *TimeSeries) Maximums(startTime, endTime, resolution int64) (map[string]
 	})
 }
 
+//
+//  For querying rollup archives.  Returns minimums value series for all keys.
+//
 func (t *TimeSeries) Minimums(startTime, endTime, resolution int64) (map[string][]float64, []int64, error) {
 	return t.walkData(startTime, endTime, resolution, func(r Rollup) float64 {
 		if r.Count > 0 {
@@ -184,6 +236,9 @@ func (t *TimeSeries) Minimums(startTime, endTime, resolution int64) (map[string]
 	})
 }
 
+//
+//  For querying raw daa from rollup archives.
+//
 func (t *TimeSeries) Rollups(startTime, endTime, resolution int64) (map[string][]Rollup, []int64, error) {
 	if resolution == t.baseArchive().Interval {
 		//TODO
@@ -216,10 +271,10 @@ func (t *TimeSeries) Rollups(startTime, endTime, resolution int64) (map[string][
 	return vals, ts, nil
 }
 
-func (t *TimeSeries) IsNew() bool {
-	return t.baseArchive().EndTime == 0
-}
-
+//
+// Write the TimeSeries to disk, and exercise retention (delete any
+// chunks that are fully expired).
+//
 func (t *TimeSeries) Write() error {
 	for _, a := range t.archives {
 		err := a.Write()
